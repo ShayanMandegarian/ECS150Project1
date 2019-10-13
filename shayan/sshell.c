@@ -74,6 +74,12 @@ int main(int argc, char *argv[])
 			perror("getline");
 			exit(1);
 		}
+
+		if (!isatty(STDIN_FILENO))
+	       	{
+     			printf("%s", cmd[0]);
+        		fflush(stdout);
+    		}
 	
 		cmd[0] = strtok(cmd[0], "\n");
 		if (cmd[0] == NULL)
