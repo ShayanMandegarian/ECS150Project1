@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <limits.h>
 
 struct input
 {
@@ -12,6 +13,32 @@ struct input
 	char* arguments[16];
 
 };
+
+int builtin(struct input* in)
+{
+	if (!strcmp(in->input, "exit"))
+	{
+		fprintf(stderr, "Bye...\n");
+		exit(0);
+		return(0);
+	}
+	else if(!strcmp(in->input, "pwd"))
+	{
+		size_t size = PATH_MAX*sizeof(char);
+		char* buffer = (char*)malloc(size);
+		if (getcwd(buffer, size) == buffer)
+		{
+			fprintf(stdout, "%s\n", buffer);
+			fprintf(stderr, "+ completed '%s' [0]\n", in->input);
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}	
+	}
+	return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -23,65 +50,73 @@ int main(int argc, char *argv[])
 	cmd[0] = (char*)malloc(size);
 	struct input *userIn = malloc(sizeof(struct input));
 
-	printf("sshell$ ");
-	int lineSize = getline(&cmd[0], &size - 1, stdin);
-	if (lineSize < 0)
+	while (1)
 	{
-		perror("getline");
-		exit(1);
-	}
-	
-	cmd[0] = strtok(cmd[0], "\n");
-	if (cmd[0] == NULL)
-        {
-		//free(cmd[0]);
-		//free(userIn);
-                main(argc, argv);
-        }
-	strcpy(userIn->input, cmd[0]);
-	//cmd[1] = NULL;
-	userIn->arguments[15] = NULL;
-
-	int counter = 0;
-	cmd[0] = strtok(userIn->input, " ");
-	while (cmd[0] != NULL)
-	{
-		//cmd[0] = strtok(NULL, " ");
-		//printf("cmd[0]: %s\n", cmd[0]);
-		if (counter == 0)
+		printf("sshell$ ");
+		int lineSize = getline(&cmd[0], &size - 1, stdin);
+		if (lineSize < 0)
 		{
-			userIn->command[counter] = cmd[0];
-			userIn->arguments[counter] = cmd[0];
+			perror("getline");
+			exit(1);
 		}
-		else if (counter > 16)
-		{
-			fprintf(stderr, "Error: too many process arguments\n");
+	
+		cmd[0] = strtok(cmd[0], "\n");
+		if (cmd[0] == NULL)
+        	{
 			//free(cmd[0]);
 			//free(userIn);
-			main(argc, argv);
+			//main(argc, argv);
+			continue;
 		}
-		else
+		strcpy(userIn->input, cmd[0]);
+		//cmd[1] = NULL;
+		userIn->arguments[15] = NULL;
+		//printf("%s\n", userIn->input);
+		if (builtin(userIn) == 1)
 		{
-			userIn->arguments[counter] = cmd[0];
+			continue;
 		}
-		cmd[0] = strtok(NULL, " ");
-		counter++;
-	}
+		int counter = 0;
+		cmd[0] = strtok(userIn->input, " ");
+		while (cmd[0] != NULL)
+		{
+			//cmd[0] = strtok(NULL, " ");
+			//printf("cmd[0]: %s\n", cmd[0]);
+			if (counter == 0)
+			{
+				userIn->command[counter] = cmd[0];
+				userIn->arguments[counter] = cmd[0];
+			}
+			else if (counter > 16)
+			{
+				fprintf(stderr, "Error: too many process arguments\n");
+				//free(cmd[0]);
+				//free(userIn);
+				main(argc, argv);
+			}
+			else
+			{
+				userIn->arguments[counter] = cmd[0];
+			}
+			cmd[0] = strtok(NULL, " ");
+			counter++;
+		}
 	
 
-	pid = fork();
-	if(pid == 0)
-	{
-		//execvp(cmd[0], cmd);
-		//printf("command: %s\n", userIn->command[0]);
-		execvp(userIn->command[0], userIn->arguments);
-		exit(1);
-	}
-	else if(pid != 0)
-	{
-		waitpid(-1, &retval, 0);
-		fprintf(stderr, "+ completed '%s' [%d]\n", userIn->input, retval);
-		main(argc, argv); // Restart so user can continue inputting commands
+		pid = fork();
+		if(pid == 0)
+		{
+			//execvp(cmd[0], cmd);
+			//printf("command: %s\n", userIn->command[0]);
+			execvp(userIn->command[0], userIn->arguments);
+			exit(1);
+		}
+		else if(pid != 0)
+		{
+			waitpid(-1, &retval, 0);
+			fprintf(stderr, "+ completed '%s' [%d]\n", userIn->input, retval);
+			//main(argc, argv); // Restart so user can continue inputting commands
+		}
 	}
 
 	return EXIT_SUCCESS;
