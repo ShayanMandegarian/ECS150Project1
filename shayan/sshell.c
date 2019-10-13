@@ -9,6 +9,7 @@
 struct input
 {
 	char input[512];
+	char rawInput[512];
 	char* command[1];
 	char* arguments[16];
 
@@ -37,7 +38,16 @@ int builtin(struct input* in)
 			return 0;
 		}	
 	}
-	return 0;
+	else if(!strcmp(in->command[0], "cd"))
+	{
+		int retval = chdir(in->arguments[1]);
+		fprintf(stderr, "+ completed '%s' [%d]\n", in->rawInput, retval);
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 int main(int argc, char *argv[])
@@ -49,10 +59,15 @@ int main(int argc, char *argv[])
 	
 	cmd[0] = (char*)malloc(size);
 	struct input *userIn = malloc(sizeof(struct input));
-
+	
 	while (1)
 	{
+		for (int i = 0; i < 16; i++)
+		{
+			userIn->arguments[i] = NULL;
+		}
 		printf("sshell$ ");
+		//printf("arg 1: %s\n", userIn->arguments[1]);
 		int lineSize = getline(&cmd[0], &size - 1, stdin);
 		if (lineSize < 0)
 		{
@@ -65,23 +80,15 @@ int main(int argc, char *argv[])
         	{
 			//free(cmd[0]);
 			//free(userIn);
-			//main(argc, argv);
 			continue;
 		}
 		strcpy(userIn->input, cmd[0]);
-		//cmd[1] = NULL;
+		strcpy(userIn->rawInput, userIn->input);
 		userIn->arguments[15] = NULL;
-		//printf("%s\n", userIn->input);
-		if (builtin(userIn) == 1)
-		{
-			continue;
-		}
 		int counter = 0;
 		cmd[0] = strtok(userIn->input, " ");
 		while (cmd[0] != NULL)
 		{
-			//cmd[0] = strtok(NULL, " ");
-			//printf("cmd[0]: %s\n", cmd[0]);
 			if (counter == 0)
 			{
 				userIn->command[counter] = cmd[0];
@@ -101,21 +108,22 @@ int main(int argc, char *argv[])
 			cmd[0] = strtok(NULL, " ");
 			counter++;
 		}
-	
+
+		if (builtin(userIn) == 1)
+		{
+			continue;
+		}		
 
 		pid = fork();
 		if(pid == 0)
 		{
-			//execvp(cmd[0], cmd);
-			//printf("command: %s\n", userIn->command[0]);
 			execvp(userIn->command[0], userIn->arguments);
 			exit(1);
 		}
 		else if(pid != 0)
 		{
 			waitpid(-1, &retval, 0);
-			fprintf(stderr, "+ completed '%s' [%d]\n", userIn->input, retval);
-			//main(argc, argv); // Restart so user can continue inputting commands
+			fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
 		}
 	}
 
