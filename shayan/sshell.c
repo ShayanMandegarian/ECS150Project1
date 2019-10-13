@@ -41,6 +41,11 @@ int builtin(struct input* in)
 	else if(!strcmp(in->command[0], "cd"))
 	{
 		int retval = chdir(in->arguments[1]);
+		if (retval == -1)
+		{
+			fprintf(stderr, "Error: no such directory\n");
+			return 1;
+		}
 		fprintf(stderr, "+ completed '%s' [%d]\n", in->rawInput, retval);
 		return 1;
 	}
@@ -129,7 +134,14 @@ int main(int argc, char *argv[])
 		else if(pid != 0)
 		{
 			waitpid(-1, &retval, 0);
-			fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
+			if (retval == 256)
+			{
+				fprintf(stderr, "Error: command not found\n");
+			}
+			else
+			{
+				fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
+			}
 		}
 	}
 
