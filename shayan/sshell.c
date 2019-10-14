@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
 		else if(pid != 0)
 		{
 			int status = waitpid(-1, &retval, 0);
-			if (WIFEXITED(retval) && status != -1)
+			if  (status == 256)
 			{
 				fprintf(stderr, "Error: command not found\n");
 			}
