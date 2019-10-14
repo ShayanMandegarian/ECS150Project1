@@ -7,6 +7,7 @@
 #include <string.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 struct input
 {
@@ -14,7 +15,17 @@ struct input
 	char rawInput[512];
 	char* command[1];
 	char* arguments[16];
+	pid_t pid;
+};
 
+struct inputArray
+{
+	struct input* inputs;
+};
+
+struct charArray
+{
+	char* string[50];
 };
 
 
@@ -103,11 +114,15 @@ int main(int argc, char *argv[])
 	
 	cmd[0] = (char*)malloc(size);
 	cmd[1] = NULL;
+	//struct inputArray *userInArray = malloc(sizeof(struct inputArray));
 	struct input *userIn = malloc(sizeof(struct input));
 	
 	while (1)
 	{
 		int cont = 0; // USED TO FLAG A CONTINUE IN A NESTED LOOP
+		int background = 0; // USED TO FLAG A BACKGROUND COMMAND
+		int error = 0; // USED TO FLAG AN ERROR
+
 		for (int i = 0; i < 16; i++)
 		{
 			userIn->arguments[i] = NULL;
@@ -139,8 +154,28 @@ int main(int argc, char *argv[])
 		userIn->arguments[15] = NULL;
 		int counter = 0;
 		cmd[0] = strtok(userIn->input, " ");
+
+		int tempArrayCounter = 0;
+		struct charArray *tempArray = malloc(sizeof(struct charArray));
 		while (cmd[0] != NULL)
 		{
+			char* temp = (char*)malloc(sizeof(size));
+			for (int k = 0; k < strlen(cmd[0]) - 1; k++)
+			{
+				if (strcmp(&cmd[0][k], "<") && &cmd[0][k] != NULL)
+				{
+					//printf("k: %s\n", cmd[0][k]);
+					//printf("temp: %s\n", temp);
+					//strcat(temp, &cmd[0][k]);
+				}
+				else if(!strcmp(&cmd[0][k], "<") && &cmd[0][k] != NULL)
+				{
+					strcpy(tempArray->string[tempArrayCounter], temp);
+					strcpy(temp, "");
+					tempArrayCounter++;
+				}
+			}
+
 			if (counter == 0)
 			{
 				userIn->command[counter] = cmd[0];
@@ -148,13 +183,19 @@ int main(int argc, char *argv[])
 			}
 			else if (counter > 16)
 			{
-				fprintf(stderr, "Error: too many process arguments\n");
-				//free(cmd[0]);
-				//free(userIn);
-				continue;
+				if (!error)
+				{
+					fprintf(stderr, "Error: too many process arguments\n");
+				}
+				error = 1;
 			}
 			else
 			{
+				if (background)
+				{
+					fprintf(stderr, "Error: mislocated background sign\n");
+					continue;
+				}
 				userIn->arguments[counter] = cmd[0];
 				if (!strcmp(cmd[0], "<"))
 				{
@@ -176,9 +217,10 @@ int main(int argc, char *argv[])
 			}
 			cmd[0] = strtok(NULL, " ");
 			counter++;
+			free(temp);
 		}
 
-		if (builtin(userIn) == 1 || cont == 1)
+		if (builtin(userIn) == 1 || cont == 1 || error == 1)
 		{
 			continue;
 		}		
@@ -220,7 +262,9 @@ int main(int argc, char *argv[])
 		}
 		else if(pid != 0)
 		{
-			int status = waitpid(-1, &retval, 0);
+			userIn->pid = pid;
+			printf("pid: %d\n", userIn->pid);
+			int status = waitpid(pid, &retval, 0);
 			if  (status == 256)
 			{
 				fprintf(stderr, "Error: command not found\n");
