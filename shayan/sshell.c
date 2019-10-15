@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 			if (test > 0)
 			{
 				userInArray[m].done = 1;
-				fprintf(stderr, "+ completed %s [%d]\n", userInArray[m].rawInput, retval);
+				fprintf(stderr, "+ completed '%s' [%d]\n", userInArray[m].rawInput, retval);
 			}
 		}
 
@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
 			temp = strtok_r(temp, "<", &temp);
 			if (temp != NULL && strcmp(temp, cmd[0]))
 			{
-				printf("FOUND! temp: %s\n", temp);
+				//printf("FOUND! temp: %s\n", temp);
 				left = (char*)malloc(512 * sizeof(char));
                                 right = (char*)malloc(512 * sizeof(char));
 				if (inRedirect(userIn, left, right) != 1)
@@ -192,22 +192,20 @@ int main(int argc, char *argv[])
 					cont = 1;
 				}
 			}
-			temp = cmd[0];	
-			temp = strtok_r(temp, "&", &temp);
-			if (temp != NULL && strcmp(temp, cmd[0]))
+			char* temp2 = (char*)malloc(sizeof(size));
+			temp2 = cmd[0];
+			//temp2 = strtok_r(temp2, "&", &temp2);
+			//printf("HI: %c\n", temp2[strlen(temp2)-1]);
+			if (temp2[strlen(temp2)-1] == *"&" && strcmp(temp2, "&"))
                         {
-                                printf("FOUND! temp: %s\n", temp);
-                                left = (char*)malloc(512 * sizeof(char));
-                                right = (char*)malloc(512 * sizeof(char));
-                                if (inRedirect(userIn, left, right) != 1)
-                                {
-                                        cont = 2;
-                                        break;
-                                }
-                                else
-                                {
-                                        cont = 1;
-                                }
+				//printf("FOUND!\n");
+				//userIn->arguments[counter] = NULL;
+				background = 2;
+				//printf("HEEYY: %c\n", cmd[0][strlen(cmd[0])-1]);
+				cmd[0][strlen(cmd[0]) -1] = *"";
+				userInArray[userInArraycounter] = *userIn;
+				userInArraycounter++;
+				
                         }	
 
 			if (counter == 0)
@@ -225,7 +223,7 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				if (background)
+				if (background == 1)
 				{
 					if (!error)
 					{
@@ -319,7 +317,7 @@ int main(int argc, char *argv[])
                                         if (test > 0)
                                         {
                                                 userInArray[m].done = 1;
-                                                fprintf(stderr, "+ completed %s [%d]\n", userInArray[m].rawInput, retval);
+                                                fprintf(stderr, "+ completed '%s' [%d]\n", userInArray[m].rawInput, retval);
                                         }
                                 }
 				if  (retval == 256)
@@ -331,7 +329,7 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
 				}
 			}
-			else if (background == 1)
+			else if (background >= 1)
                         {
                                 status = waitpid(-1, &retval, WNOHANG);
                                 if  (retval == 256)
