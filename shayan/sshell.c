@@ -28,7 +28,6 @@ struct charArray
 int inRedirect(struct input* in, char* left, char* right)
 {
 	char* tokenize; // used to get the command info from the command line
-
         tokenize = (char*)malloc(512 * sizeof(char)); // allocate the strings
 	strcpy(tokenize, in->rawInput);
 	tokenize = strtok(tokenize, "<"); // tokenize the input to split before and after the <
@@ -170,25 +169,46 @@ int main(int argc, char *argv[])
 		int counter = 0;
 		cmd[0] = strtok(userIn->input, " ");
 
-		int tempArrayCounter = 0;
-		struct charArray *tempArray = malloc(sizeof(struct charArray));
+		//int tempArrayCounter = 0;
+		//struct charArray *tempArray = malloc(sizeof(struct charArray));
 		while (cmd[0] != NULL)
 		{
+			
 			char* temp = (char*)malloc(sizeof(size));
-			for (int k = 0; k < strlen(cmd[0]) - 1; k++)
+			temp = cmd[0];
+			temp = strtok_r(temp, "<", &temp);
+			if (temp != NULL && strcmp(temp, cmd[0]))
 			{
-				if (strcmp(&cmd[0][k], "<") && &cmd[0][k] != NULL)
+				printf("FOUND! temp: %s\n", temp);
+				left = (char*)malloc(512 * sizeof(char));
+                                right = (char*)malloc(512 * sizeof(char));
+				if (inRedirect(userIn, left, right) != 1)
 				{
-					temp[strlen(temp)] =  cmd[0][k];
-					//printf("TEMP: %s\n", temp);
+					cont = 2;
+					break;
 				}
-				else if(!strcmp(&cmd[0][k], "<") && &cmd[0][k] != NULL)
+				else
 				{
-					strcpy(tempArray->string[tempArrayCounter], temp);
-					strcpy(temp, " ");
-					tempArrayCounter++;
+					cont = 1;
 				}
 			}
+			temp = cmd[0];	
+			temp = strtok_r(temp, "&", &temp);
+			if (temp != NULL && strcmp(temp, cmd[0]))
+                        {
+                                printf("FOUND! temp: %s\n", temp);
+                                left = (char*)malloc(512 * sizeof(char));
+                                right = (char*)malloc(512 * sizeof(char));
+                                if (inRedirect(userIn, left, right) != 1)
+                                {
+                                        cont = 2;
+                                        break;
+                                }
+                                else
+                                {
+                                        cont = 1;
+                                }
+                        }	
 
 			if (counter == 0)
 			{
@@ -240,7 +260,7 @@ int main(int argc, char *argv[])
 			}
 			cmd[0] = strtok(NULL, " ");
 			counter++;
-			free(temp);
+			//free(temp);
 		}
 
 		if (builtin(userIn, test) == 1 || cont == 1 || error == 1 || userIn->command[0] == NULL)
