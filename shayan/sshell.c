@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <errno.h>
 
 struct input
 {
@@ -19,17 +20,10 @@ struct input
 	int done;
 };
 
-struct inputArray
-{
-	struct input* inputs[50];
-	int counter;
-};
-
 struct charArray
 {
 	char* string[50];
 };
-
 
 int inRedirect(struct input* in, char* left, char* right)
 {
@@ -121,9 +115,8 @@ int main(int argc, char *argv[])
 	
 	cmd[0] = (char*)malloc(size);
 	cmd[1] = NULL;
-	struct inputArray *userInArray = malloc(sizeof(struct inputArray));
-	userInArray->counter = 0;
-	//struct input *userIn = malloc(sizeof(struct input));
+	int userInArraycounter = 0;
+	struct input userInArray[50];
 	
 	while (1)
 	{
@@ -133,25 +126,25 @@ int main(int argc, char *argv[])
 		int error = 0; // USED TO FLAG AN ERROR
 
 		int test = 1; // = waitpid(-1, &retval, WNOHANG);
-		//printf("test: %d\n", test);
-		//if (test > 0)
-		//{
-			for (int m = 0; m < userInArray->counter; m++)
+		for (int m = 0; m < userInArraycounter; m++)
+		{
+			if (userInArray[m].done == 1)
 			{
-				test = waitpid(userInArray->inputs[m]->pid, &retval, WNOHANG);
-				if (userInArray->inputs[m]->pid == test)
-				{
-					printf("+ completed %s [%d]\n", userInArray->inputs[m]->rawInput, retval);
-				}
+				continue;
 			}
-		//}
+			test = waitpid(-1, &retval, WNOHANG);
+			if (test > 0)
+			{
+				userInArray[m].done = 1;
+				fprintf(stderr, "+ completed %s [%d]\n", userInArray[m].rawInput, retval);
+			}
+		}
 
 		for (int i = 0; i < 16; i++)
 		{
 			userIn->arguments[i] = NULL;
 		}
 		printf("sshell$ ");
-		//printf("arg 1: %s\n", userIn->arguments[1]);
 		int lineSize = getline(&cmd[0], &size - 1, stdin);
 		if (lineSize < 0)
 		{
@@ -168,7 +161,6 @@ int main(int argc, char *argv[])
 		cmd[0] = strtok(cmd[0], "\n");
 		if (cmd[0] == NULL)
         	{
-			//free(cmd[0]);
 			free(userIn);
 			continue;
 		}
@@ -187,14 +179,13 @@ int main(int argc, char *argv[])
 			{
 				if (strcmp(&cmd[0][k], "<") && &cmd[0][k] != NULL)
 				{
-					//printf("k: %s\n", cmd[0][k]);
-					//printf("temp: %s\n", temp);
-					//strcat(temp, &cmd[0][k]);
+					temp[strlen(temp)] =  cmd[0][k];
+					//printf("TEMP: %s\n", temp);
 				}
 				else if(!strcmp(&cmd[0][k], "<") && &cmd[0][k] != NULL)
 				{
 					strcpy(tempArray->string[tempArrayCounter], temp);
-					strcpy(temp, "");
+					strcpy(temp, " ");
 					tempArrayCounter++;
 				}
 			}
@@ -227,11 +218,8 @@ int main(int argc, char *argv[])
 				{
 					userIn->arguments[counter] = NULL;
 					background = 1;
-					//printf("counter: %d\n", userInArray->counter); 
-					userInArray->inputs[userInArray->counter] = userIn;
-					//userInArray->inputs[0] = userIn;
-					userInArray->counter++;
-					//printf("test: %s\n", userInArray->inputs[userInArray->counter]->rawInput);
+					userInArray[userInArraycounter] = *userIn;
+					userInArraycounter++;
 				}
 
 				if (!strcmp(cmd[0], "<"))
@@ -240,8 +228,6 @@ int main(int argc, char *argv[])
         				right = (char*)malloc(512 * sizeof(char));
 					if (inRedirect(userIn, left, right) != 1)
 					{
-						//printf("left: %s\n", left);
-						//printf("right: %s\n", right);
 						cont = 2; // NEED TO CHANGE REDIRECTION
 						break;
 					}
@@ -257,7 +243,7 @@ int main(int argc, char *argv[])
 			free(temp);
 		}
 
-		if (builtin(userIn, test) == 1 || cont == 1 || error == 1)
+		if (builtin(userIn, test) == 1 || cont == 1 || error == 1 || userIn->command[0] == NULL)
 		{
 			free(userIn);
 			continue;
@@ -266,11 +252,6 @@ int main(int argc, char *argv[])
 		pid = fork();
 		if(pid == 0)
 		{
-			//printf("cont: %d\n", cont);
-			if (background == 1)
-			{
-				setpgid(0,0);
-			}
 			if (cont == 2)
 			{
 				int inFile = open(right, O_RDONLY);      
@@ -289,7 +270,6 @@ int main(int argc, char *argv[])
 					{
 						userIn->arguments[j] = NULL;
 					}
-					//printf("%d: %s\n", j, userIn->arguments[j]);
 				}
 				execvp(userIn->command[0], userIn->arguments);
 				exit(1);
@@ -305,20 +285,44 @@ int main(int argc, char *argv[])
 		else if(pid != 0)
 		{
 			userIn->pid = pid;
-			//printf("pid: %d\n", userIn->pid);
 			int status;
 			if (background == 0)
 			{
-				status = waitpid(-1, &retval, 0);
-				if  (status == 256)
+				status = waitpid(pid, &retval, 0);
+				for (int m = 0; m < userInArraycounter; m++)
+                                {
+                                        if (userInArray[m].done == 1)
+                                        {
+                                                continue;
+                                        }
+                                        test = waitpid(-1, NULL, WNOHANG);
+                                        if (test > 0)
+                                        {
+                                                userInArray[m].done = 1;
+                                                fprintf(stderr, "+ completed %s [%d]\n", userInArray[m].rawInput, retval);
+                                        }
+                                }
+				if  (retval == 256)
 				{
 					fprintf(stderr, "Error: command not found\n");
 				}
-				else
+				else if (status == pid)
 				{
 					fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
 				}
 			}
+			else if (background == 1)
+                        {
+                                status = waitpid(-1, &retval, WNOHANG);
+                                if  (retval == 256)
+                                {
+                                        fprintf(stderr, "Error: command not found\n");
+                                }
+                                else if (status > 0)
+                                {
+                                        fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
+                                }
+                        }
 		}
 		free(userIn);
 	}
