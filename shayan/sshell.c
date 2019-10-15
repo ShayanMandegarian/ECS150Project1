@@ -16,11 +16,13 @@ struct input
 	char* command[1];
 	char* arguments[16];
 	pid_t pid;
+	int done;
 };
 
 struct inputArray
 {
-	struct input* inputs;
+	struct input* inputs[50];
+	int counter;
 };
 
 struct charArray
@@ -63,10 +65,15 @@ int inRedirect(struct input* in, char* left, char* right)
 }
 
 
-int builtin(struct input* in)
+int builtin(struct input* in, int error)
 {
 	if (!strcmp(in->input, "exit"))
 	{
+		if (error == 0)
+		{
+			fprintf(stderr, "Error: active jobs still running\n");
+			return 1;
+		}
 		fprintf(stderr, "Bye...\n");
 		exit(0);
 		return 0;
@@ -114,14 +121,30 @@ int main(int argc, char *argv[])
 	
 	cmd[0] = (char*)malloc(size);
 	cmd[1] = NULL;
-	//struct inputArray *userInArray = malloc(sizeof(struct inputArray));
-	struct input *userIn = malloc(sizeof(struct input));
+	struct inputArray *userInArray = malloc(sizeof(struct inputArray));
+	userInArray->counter = 0;
+	//struct input *userIn = malloc(sizeof(struct input));
 	
 	while (1)
 	{
+		struct input *userIn = malloc(sizeof(struct input));
 		int cont = 0; // USED TO FLAG A CONTINUE IN A NESTED LOOP
 		int background = 0; // USED TO FLAG A BACKGROUND COMMAND
 		int error = 0; // USED TO FLAG AN ERROR
+
+		int test = 1; // = waitpid(-1, &retval, WNOHANG);
+		//printf("test: %d\n", test);
+		//if (test > 0)
+		//{
+			for (int m = 0; m < userInArray->counter; m++)
+			{
+				test = waitpid(userInArray->inputs[m]->pid, &retval, WNOHANG);
+				if (userInArray->inputs[m]->pid == test)
+				{
+					printf("+ completed %s [%d]\n", userInArray->inputs[m]->rawInput, retval);
+				}
+			}
+		//}
 
 		for (int i = 0; i < 16; i++)
 		{
@@ -146,7 +169,7 @@ int main(int argc, char *argv[])
 		if (cmd[0] == NULL)
         	{
 			//free(cmd[0]);
-			//free(userIn);
+			free(userIn);
 			continue;
 		}
 		strcpy(userIn->input, cmd[0]);
@@ -193,10 +216,24 @@ int main(int argc, char *argv[])
 			{
 				if (background)
 				{
-					fprintf(stderr, "Error: mislocated background sign\n");
-					continue;
+					if (!error)
+					{
+						fprintf(stderr, "Error: mislocated background sign\n");
+					}
+					error = 1;
 				}
 				userIn->arguments[counter] = cmd[0];
+				if (!strcmp(cmd[0], "&"))
+				{
+					userIn->arguments[counter] = NULL;
+					background = 1;
+					//printf("counter: %d\n", userInArray->counter); 
+					userInArray->inputs[userInArray->counter] = userIn;
+					//userInArray->inputs[0] = userIn;
+					userInArray->counter++;
+					//printf("test: %s\n", userInArray->inputs[userInArray->counter]->rawInput);
+				}
+
 				if (!strcmp(cmd[0], "<"))
 				{
 					left = (char*)malloc(512 * sizeof(char));
@@ -220,8 +257,9 @@ int main(int argc, char *argv[])
 			free(temp);
 		}
 
-		if (builtin(userIn) == 1 || cont == 1 || error == 1)
+		if (builtin(userIn, test) == 1 || cont == 1 || error == 1)
 		{
+			free(userIn);
 			continue;
 		}		
 
@@ -229,6 +267,10 @@ int main(int argc, char *argv[])
 		if(pid == 0)
 		{
 			//printf("cont: %d\n", cont);
+			if (background == 1)
+			{
+				setpgid(0,0);
+			}
 			if (cont == 2)
 			{
 				int inFile = open(right, O_RDONLY);      
@@ -263,17 +305,22 @@ int main(int argc, char *argv[])
 		else if(pid != 0)
 		{
 			userIn->pid = pid;
-			printf("pid: %d\n", userIn->pid);
-			int status = waitpid(pid, &retval, 0);
-			if  (status == 256)
+			//printf("pid: %d\n", userIn->pid);
+			int status;
+			if (background == 0)
 			{
-				fprintf(stderr, "Error: command not found\n");
-			}
-			else
-			{
-				fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
+				status = waitpid(-1, &retval, 0);
+				if  (status == 256)
+				{
+					fprintf(stderr, "Error: command not found\n");
+				}
+				else
+				{
+					fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
+				}
 			}
 		}
+		free(userIn);
 	}
 	return EXIT_SUCCESS;
 }
