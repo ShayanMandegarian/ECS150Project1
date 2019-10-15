@@ -169,8 +169,6 @@ int main(int argc, char *argv[])
 		int counter = 0;
 		cmd[0] = strtok(userIn->input, " ");
 
-		//int tempArrayCounter = 0;
-		//struct charArray *tempArray = malloc(sizeof(struct charArray));
 		while (cmd[0] != NULL)
 		{
 			
@@ -179,7 +177,6 @@ int main(int argc, char *argv[])
 			temp = strtok_r(temp, "<", &temp);
 			if (temp != NULL && strcmp(temp, cmd[0]))
 			{
-				//printf("FOUND! temp: %s\n", temp);
 				left = (char*)malloc(512 * sizeof(char));
                                 right = (char*)malloc(512 * sizeof(char));
 				if (inRedirect(userIn, left, right) != 1)
@@ -194,14 +191,9 @@ int main(int argc, char *argv[])
 			}
 			char* temp2 = (char*)malloc(sizeof(size));
 			temp2 = cmd[0];
-			//temp2 = strtok_r(temp2, "&", &temp2);
-			//printf("HI: %c\n", temp2[strlen(temp2)-1]);
 			if (temp2[strlen(temp2)-1] == *"&" && strcmp(temp2, "&"))
                         {
-				//printf("FOUND!\n");
-				//userIn->arguments[counter] = NULL;
 				background = 2;
-				//printf("HEEYY: %c\n", cmd[0][strlen(cmd[0])-1]);
 				cmd[0][strlen(cmd[0]) -1] = *"";
 				userInArray[userInArraycounter] = *userIn;
 				userInArraycounter++;
@@ -258,7 +250,6 @@ int main(int argc, char *argv[])
 			}
 			cmd[0] = strtok(NULL, " ");
 			counter++;
-			//free(temp);
 		}
 
 		if (builtin(userIn, test) == 1 || cont == 1 || error == 1 || userIn->command[0] == NULL)
