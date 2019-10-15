@@ -8,13 +8,14 @@
 #include <limits.h>
 #include <fcntl.h>
 
+//const int PATH_MAX = 512;
+
 struct input
 {
 	char input[512];
 	char rawInput[512];
 	char* command[1];
 	char* arguments[16];
-
 };
 
 
@@ -29,14 +30,9 @@ int inRedirect(struct input* in, char* left, char* right)
 	while (tokenize != NULL)
 	{
 		if (iterator == 0)
-		{
 			strcpy(left, tokenize);
-		}
 		else if (iterator == 1)
-		{
 			strcpy(right, tokenize);
-			
-		}
 		tokenize = strtok(NULL, "<");
 		tokenize = strtok(tokenize, " ");
 		iterator++;
@@ -48,6 +44,27 @@ int inRedirect(struct input* in, char* left, char* right)
 		return 1;
 	}
 
+	return 0;
+}
+
+int outRedirect(struct input* in, char* left, char* right){
+	char *token = strdup(in->rawInput);
+	int iterator = 0;
+
+	token = strtok(token, ">");
+	while(token != NULL){
+		if(iterator == 0)
+			strcpy(left, token);
+		else if(iterator == 1)
+			strcpy(right, token);
+		token = strtok(NULL, ">");
+		iterator++;
+	}
+
+	if(iterator == 1){
+		fprintf(stderr, "Error: no output file\n");
+		return 1;
+	}
 	return 0;
 }
 
@@ -79,10 +96,8 @@ int builtin(struct input* in)
 	{
 		int retval = chdir(in->arguments[1]);
 		if (retval == -1)
-		{
 			fprintf(stderr, "Error: no such directory\n");
-			return 1;
-		}
+
 		fprintf(stderr, "+ completed '%s' [%d]\n", in->rawInput, retval);
 		return 1;
 	}
@@ -96,7 +111,7 @@ int main(int argc, char *argv[])
 {
 	int retval;
 	char* cmd[2];
-	size_t size = 512 * sizeof(char);
+	size_t size = PATH_MAX * sizeof(char);
 	pid_t pid;
 	char* left;
 	char* right;
@@ -137,16 +152,16 @@ int main(int argc, char *argv[])
 		strcpy(userIn->input, cmd[0]);
 		strcpy(userIn->rawInput, userIn->input);
 		userIn->arguments[15] = NULL;
-		int counter = 0;
+		int iteratorer = 0;
 		cmd[0] = strtok(userIn->input, " ");
 		while (cmd[0] != NULL)
 		{
-			if (counter == 0)
+			if (iteratorer == 0)
 			{
-				userIn->command[counter] = cmd[0];
-				userIn->arguments[counter] = cmd[0];
+				userIn->command[iteratorer] = cmd[0];
+				userIn->arguments[iteratorer] = cmd[0];
 			}
-			else if (counter > 16)
+			else if (iteratorer > 16)
 			{
 				fprintf(stderr, "Error: too many process arguments\n");
 				//free(cmd[0]);
@@ -155,9 +170,8 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				userIn->arguments[counter] = cmd[0];
-				if (!strcmp(cmd[0], "<"))
-				{
+				userIn->arguments[iteratorer] = cmd[0];
+				if (!strcmp(cmd[0], "<")) {
 					left = (char*)malloc(512 * sizeof(char));
         				right = (char*)malloc(512 * sizeof(char));
 					if (inRedirect(userIn, left, right) != 1)
@@ -173,9 +187,20 @@ int main(int argc, char *argv[])
 					}
 					
 				}
+				else if(!strcmp(cmd[0], ">")) {
+					left = (char*)malloc(512 * sizeof(char));
+        				right = (char*)malloc(512 * sizeof(char));
+					if (outRedirect(userIn, left, right) != 1) {
+						cont = 3;
+						break;
+					}
+					else {
+						cont = 1;
+					}
+				}
 			}
 			cmd[0] = strtok(NULL, " ");
-			counter++;
+			iteratorer++;
 		}
 
 		if (builtin(userIn) == 1 || cont == 1)
@@ -207,9 +232,30 @@ int main(int argc, char *argv[])
 					}
 					//printf("%d: %s\n", j, userIn->arguments[j]);
 				}
+
 				execvp(userIn->command[0], userIn->arguments);
 				exit(1);
 
+			}
+			else if(cont == 3) {
+				int outFile = open(right, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+				if(outFile == -1)
+				{
+					perror("Error: cannot open output file\n");
+					close(outFile);
+					continue;
+				}
+				dup2(outFile, 1);
+				close(outFile);
+				for (int j = 0; j < 16; j++)
+				{
+					if (userIn->arguments[j] != NULL && !strcmp(userIn->arguments[j], ">"))
+					{
+						userIn->arguments[j] = NULL;
+					}
+				}
+				execvp(userIn->command[0], userIn->arguments);
+				exit(1);
 			}
 			else
 			{
@@ -220,15 +266,8 @@ int main(int argc, char *argv[])
 		}
 		else if(pid != 0)
 		{
-			int status = waitpid(-1, &retval, 0);
-			if (WIFEXITED(retval) && status != -1)
-			{
-				fprintf(stderr, "Error: command not found\n");
-			}
-			else
-			{
-				fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
-			}
+			waitpid(-1, &retval, 0);
+			fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
 		}
 	}
 	return EXIT_SUCCESS;
