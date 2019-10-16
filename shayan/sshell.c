@@ -10,15 +10,6 @@
 #include <ctype.h>
 #include <errno.h>
 
-struct input
-{
-	char input[512];
-	char rawInput[512];
-	char* command[1];
-	char* arguments[16];
-	pid_t pid;
-	int done;
-};
 
 /*
 
@@ -41,37 +32,52 @@ void pipeline(struct input *in){
 	}
 }
 */
+struct input // this struct stores infomation about each user input
+{
+	char input[512]; // largely place holder
+	char rawInput[512]; // stores the exact input for the completed message
+	char* command[1]; // stores the COMMAND, aka the first argument, ie "date"
+	char* arguments[16]; // stores the command and all the arguments, ie "date -u..."
+	pid_t pid; // stores the PID of the child process running the command
+	int done; // stores if the process running the command is done or not
+};
+
+struct charArray
+{
+	char* string[50];
+};
+
 
 int inRedirect(struct input* in, char* left, char* right)
-{
+{ // this function handles input redirection when a "<" character is detected
 	char* tokenize; // used to get the command info from the command line
         tokenize = (char*)malloc(512 * sizeof(char)); // allocate the strings
-	strcpy(tokenize, in->rawInput);
+	strcpy(tokenize, in->rawInput); 
 	tokenize = strtok(tokenize, "<"); // tokenize the input to split before and after the <
 	int iterator = 0;
 	while (tokenize != NULL)
 	{
-		if (iterator == 0)
+		if (iterator == 0) // since iterator is expected only to be 0 or 1...
 		{
-			strcpy(left, tokenize);
+			strcpy(left, tokenize); //... before the < is "left" ...
 		}
 		else if (iterator == 1)
 		{
-			strcpy(right, tokenize);
+			strcpy(right, tokenize); // ... after the < is "right".
 			
 		}
 		tokenize = strtok(NULL, "<");
-		tokenize = strtok(tokenize, " ");
+		tokenize = strtok(tokenize, " "); // remove spaces after the "<".
 		iterator++;
 	}
 
 	if (iterator == 1) // IF NO SOURCE WAS PRESENT, ERROR
 	{
 		fprintf(stderr, "Error: no input file\n");
-		return 1;
+		return 1; // RETURN VAL OF 1 MEANS ERROR
 	}
 
-	return 0;
+	return 0; // RETURN VAL OF 0 MEANS SUCCESS
 }
 
 int outRedirect(struct input* in, char* left, char* right){
@@ -79,7 +85,8 @@ int outRedirect(struct input* in, char* left, char* right){
 	int iterator = 0;
 
 	token = strtok(token, ">");
-	while(token != NULL){
+	while(token != NULL)
+  {
 		if(iterator == 0)
 			strcpy(left, token);
 		else if(iterator == 1)
@@ -89,39 +96,43 @@ int outRedirect(struct input* in, char* left, char* right){
 		iterator++;
 	}
 
-	if(iterator == 1){
+	if(iterator == 1)
+  {
 		fprintf(stderr, "Error: no output file\n");
 		return 1;
 	}
 	return 0;
 }
 
-int getCount(char* cmd){
+int getCount(char* cmd)
+{
 	int count = 0;
 	char *token = strdup(cmd);
 
 	token = strtok(cmd, "|");
-	while(token != NULL){
+	while(token != NULL)
+  {
 		count++;
 	}
 	return count;
 }
 
-
 int builtin(struct input* in, int error)
-{
+{ // this function handles built in commands: pwd, cd, exit
+
 	if (!strcmp(in->input, "exit"))
 	{
 		if (error == 0)
 		{
 			fprintf(stderr, "Error: active jobs still running\n");
-			return 1;
+
+			return 1; // RETURN VAL 1 MEANS BUILT IN FUNCTION DIDN'T HAPPEN
 		}
 		fprintf(stderr, "Bye...\n");
 		exit(0);
-		return 0;
+		return 0; // RETURN VAL 0 MEANS BUILT IN FUNCTION *DID* HAPPEN
 	}
-	else if(!strcmp(in->input, "pwd"))
+	else if(!strcmp(in->input, "pwd")) // basically just prints result of getcwd.
 	{
 		size_t size = PATH_MAX*sizeof(char);
 		char* buffer = (char*)malloc(size);
@@ -136,7 +147,7 @@ int builtin(struct input* in, int error)
 			return 0;
 		}	
 	}
-	else if(!strcmp(in->command[0], "cd"))
+	else if(!strcmp(in->command[0], "cd")) // Basically just calls chdir and checks if it succeeded
 	{
 		int retval = chdir(in->arguments[1]);
 		if (retval == -1)
@@ -166,101 +177,99 @@ int main(int argc, char *argv[])
 	cmd[0] = (char*)malloc(size);
 	cmd[1] = NULL;
 	int userInArraycounter = 0;
-	struct input userInArray[50];
+
+	struct input userInArray[500];
 	
-	while (1)
-	{
-		struct input *userIn = malloc(sizeof(struct input));
+	while (1) // after creating the needed variables, start the main while loop
+	{         // this loop repeats until the program is exitted by the user, or crashes.
+
+		struct input *userIn = malloc(sizeof(struct input)); 
 		int cont = 0; // USED TO FLAG A CONTINUE IN A NESTED LOOP
 		int background = 0; // USED TO FLAG A BACKGROUND COMMAND
 		int error = 0; // USED TO FLAG AN ERROR
 
 		int test = 1; // = waitpid(-1, &retval, WNOHANG);
 		for (int m = 0; m < userInArraycounter; m++)
-		{
+		{ // this for loop checks for completed background functions
 			if (userInArray[m].done == 1)
 			{
-				continue;
+				continue; // if the current background function is already complete, move on
 			}
 			test = waitpid(-1, &retval, WNOHANG);
-			if (test > 0)
+			if (test > 0) // if waitpid returns other than 0 or -1, it is completed.
 			{
 				userInArray[m].done = 1;
 				fprintf(stderr, "+ completed '%s' [%d]\n", userInArray[m].rawInput, retval);
 			}
 		}
 
-		for (int i = 0; i < 16; i++)
+		for (int i = 0; i < 16; i++) // resets all of the arguments of userIn to NULL for new command
 		{
 			userIn->arguments[i] = NULL;
 		}
+		printf("sshell$ "); // PRINTS THE PROMPT
+		//getline(&cmd[0], &size - 1, stdin);
 
-		printf("sshell$ ");
-		int lineSize = getline(&cmd[0], &size - 1, stdin);
-		//int numOfCommands = getCount(cmd[0]);
-
-		if (lineSize < 0)
+		if (getline(&cmd[0], &size - 1, stdin) < 0) // READS INPUT FROM STDIN
 		{
 			perror("getline");
 			exit(1);
 		}
 
-		if (!isatty(STDIN_FILENO))
+		if (!isatty(STDIN_FILENO)) // FOR THE TESTER SCRIPT TO WORK
 	       	{
      			printf("%s", cmd[0]);
         		fflush(stdout);
     		}
 	
-		cmd[0] = strtok(cmd[0], "\n");
-		if (cmd[0] == NULL)
+		cmd[0] = strtok(cmd[0], "\n"); // removes the new line character from the input
+		if (cmd[0] == NULL) // if no input given, continue to the next loop
         	{
 			free(userIn);
 			continue;
 		}
 		
 		strcpy(userIn->input, cmd[0]);
-		strcpy(userIn->rawInput, userIn->input);
-		userIn->arguments[15] = NULL;
+		strcpy(userIn->rawInput, userIn->input); // store the raw input for completed message
+		userIn->arguments[15] = NULL; // set the final argument to null
 		int counter = 0;
-		cmd[0] = strtok(userIn->input, " ");
+		cmd[0] = strtok(userIn->input, " "); // start tokenizing with spaces
 
-		while (cmd[0] != NULL)
+		while (cmd[0] != NULL) // repeat the loop while the token isn't null, ie there are more arguments
 		{
 			
-			char* temp = (char*)malloc(sizeof(size));
+			char* temp = (char*)malloc(sizeof(size)); // temp variable used to parsing special characters
 			temp = cmd[0];
 			temp = strtok_r(temp, "<", &temp);
-			if (temp != NULL && strcmp(temp, cmd[0]))
+			if (temp != NULL && strcmp(temp, cmd[0])) // if "<" detected in the argument...
 			{
 				left = (char*)malloc(512 * sizeof(char));
                                 right = (char*)malloc(512 * sizeof(char));
-				if (inRedirect(userIn, left, right) != 1)
+				if (inRedirect(userIn, left, right) != 1) // call the indirect function
 				{
-					cont = 2;
+					cont = 2; // FLAG THAT INDIRECT WORKED
 					break;
 				}
 				else
 				{
-					cont = 1;
+					cont = 1; // FLAG THAT INDIRECT FAILED
 				}
 			}
 			char* temp2 = (char*)malloc(sizeof(size));
 			temp2 = cmd[0];
-			if (temp2[strlen(temp2)-1] == *"&" && strcmp(temp2, "&"))
-                        {
-				background = 2;
-				cmd[0][strlen(cmd[0]) -1] = *"";
-				userInArray[userInArraycounter] = *userIn;
-				userInArraycounter++;
-				
-                        }	
-
-			if (counter == 0)
+			if (temp2[strlen(temp2)-1] == *"&" && strcmp(temp2, "&")) // if "&" detected...
+      {
+				background = 2; // FLAG THAT "&" WAS DETECTED AS PART OF AN ARGUMENT, NOT BY ITSELF
+				cmd[0][strlen(cmd[0]) -1] = *""; // replace the & character with nothing
+				userInArray[userInArraycounter] = *userIn; // store the current input into an array of background commands
+				userInArraycounter++;	
+      }	
+			if (counter == 0) // the first word is both the command, and the first argument
 			{
 				userIn->command[counter] = cmd[0];
 				userIn->arguments[counter] = cmd[0];
 			}
-			else if (counter > 16)
+			else if (counter > 16) // if there are more than 16 arguments, there are too many
 			{
 				if (!error)
 				{
@@ -272,14 +281,14 @@ int main(int argc, char *argv[])
 			{
 				if (background == 1)
 				{
-					if (!error)
+					if (!error) // & NOT PLACED AT END
 					{
 						fprintf(stderr, "Error: mislocated background sign\n");
 					}
 					error = 1;
 				}
 				userIn->arguments[counter] = cmd[0];
-				if (!strcmp(cmd[0], "&"))
+				if (!strcmp(cmd[0], "&")) // IF & DETECTED BY ITSELF, similar to above but does not replace the "&" char
 				{
 					userIn->arguments[counter] = NULL;
 					background = 1;
@@ -287,7 +296,7 @@ int main(int argc, char *argv[])
 					userInArraycounter++;
 				}
 
-				if (!strcmp(cmd[0], "<"))
+				if (!strcmp(cmd[0], "<")) // similar to above command but with "<"
 				{
 					left = (char*)malloc(512 * sizeof(char));
         				right = (char*)malloc(512 * sizeof(char));
@@ -302,35 +311,36 @@ int main(int argc, char *argv[])
 					}
 					
 				}
-				else if(!strcmp(cmd[0], ">")) {
+				else if(!strcmp(cmd[0], ">")) 
+        {
                         		left = (char*)malloc(512 * sizeof(char));
                         		right = (char*)malloc(512 * sizeof(char));
                         		if (outRedirect(userIn, left, right) != 1) {
                                			cont = 3;
                                 		break;
-                        		}
+        }
 					else {
 						cont = 1;
 					}
                 		}
 			}
-			cmd[0] = strtok(NULL, " ");
+			cmd[0] = strtok(NULL, " "); // GET THE NEXT TOKEN, and repeat the loop
 			counter++;
 		}
 
 		if (builtin(userIn, test) == 1 || cont == 1 || error == 1 || userIn->command[0] == NULL)
-		{
+		{ // IF ANY OF THESE FLAGS MATCH, CONTINUE TO THE NEXT LOOP WITHOUT FORKING AND EXECVP'ING
 			free(userIn);
 			continue;
 		}		
 
-		pid = fork();
+		pid = fork(); // create the child process...
 		if(pid == 0)
 		{
-			if (cont == 2)
+			if (cont == 2) // what happens if the input redirect flag is marked
 			{
-				int inFile = open(right, O_RDONLY);      
-				if (inFile == -1)
+				int inFile = open(right, O_RDONLY);
+				if (inFile == -1) // input file can't be openned
 				{
 					fprintf(stderr, "Error: cannot open input file\n");
 					close(inFile);
@@ -382,11 +392,11 @@ int main(int argc, char *argv[])
 		{
 			userIn->pid = pid;
 			int status;
-			if (background == 0)
+			if (background == 0) // if the current command is not a background command
 			{
 				status = waitpid(pid, &retval, 0);
 				for (int m = 0; m < userInArraycounter; m++)
-                                {
+                                { // first check for any completed background functions
                                         if (userInArray[m].done == 1)
                                         {
                                                 continue;
@@ -407,7 +417,7 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "+ completed '%s' [%d]\n", userIn->rawInput, retval);
 				}
 			}
-			else if (background >= 1)
+			else if (background >= 1) // if it IS a background command, use the WNOHANG option
                         {
                                 status = waitpid(-1, &retval, WNOHANG);
                                 if  (retval == 256)
