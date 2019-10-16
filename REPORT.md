@@ -10,7 +10,7 @@ program running repeatedly until the user purposely exits it.
 Our main sources of help for our implementation came from the lecture pages,
 various questions on StackOverflow and Piazza, as well as the gnu.org manual
 pages linked in the project description, and other varied programming help
-websites like tutorialspoint.com and geeksforgeeks.org.
+websites like tutorialspoint.com and geeksforgeeks.org for example code.
 
 ## Phase 2
 
@@ -31,7 +31,9 @@ command.
 ## Phase 4
 
 Built-in commands were implemented. These commands were taken care of in its
-own function. 
+own function. Furthermore, these commands were executed without any forking.
+This is because changing the working directory of the child process through 
+the exec system call will not change the working directory of the main program.
 
 ## Phase 5
 For input redirection, the program has two main steps.
@@ -55,11 +57,26 @@ it, it will function.
 Similar to phase 5, if the ">" character is detected, the outRedirect function 
 is called to denote the file which we will be writing to. Output redirection
 also sets a flag to let the program know that the output must be redirected to
-a different file. If the file does not exist, it will be created and if it already
-exists, it will be truncated and rewritten.
+a different file. If the file does not exist, it will be created and if it 
+already exists, it will be truncated and rewritten. To do so, the flags
+O_RDWR | O_CREAT | O_TRUNC are used.
 
 ## Phase 7
 
+To execute pipes, we decided to keep a count of the number of commands per line 
+that are separated by a pipe character. Since the total number of arguments
+including the command is 16, we decided to use a struct pointer array of size 16 
+to store these commands. Once this preprocessing is done, a loop over the total
+number of commands is done where the pipeline function is called for every 
+command except for the last one.
+
+The pipeline function then handles creating pipes. Pipes are created using the 
+pipe function and the file descriptor table is updated. Then, dup2 is used to 
+duplicate the stdin and stdout file descriptors into the pipe.
+
+Unfortunately, we were unable to complete this phase of the project. Leaving it
+half done would have broken the program and so we left some the code commented
+out to see what the implementation may have looked like.
 
 ## Phase 8
 In order to allow for background functions, we added a for loop to the start of
