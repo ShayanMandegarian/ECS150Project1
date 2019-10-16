@@ -1,5 +1,5 @@
 # ECS 150 Project 1
-### by Shayan Mandegarian and Faraz Ahamed
+### by Shayan Mandegarian and Faraz Cherukattil
 
 The main structure of our program consists of the main function, which parses
 input in a while loop, deals with the processes, and calls helper functions.
@@ -14,6 +14,8 @@ websites like tutorialspoint.com and geeksforgeeks.org.
 
 ## Phase 2
 
+Input parsing is done with the help of the getline function. Empty and invalid
+inputs are also addressed. Parsing errors are also displayed.
 
 ## Phase 3
 This phase is where the while loop that parses the input, and the input struct
@@ -28,6 +30,8 @@ command.
 
 ## Phase 4
 
+Built-in commands were implemented. These commands were taken care of in its
+own function. 
 
 ## Phase 5
 For input redirection, the program has two main steps.
@@ -48,6 +52,11 @@ it, it will function.
 
 ## Phase 6
 
+Similar to phase 5, if the ">" character is detected, the outRedirect function 
+is called to denote the file which we will be writing to. Output redirection
+also sets a flag to let the program know that the output must be redirected to
+a different file. If the file does not exist, it will be created and if it already
+exists, it will be truncated and rewritten.
 
 ## Phase 7
 
