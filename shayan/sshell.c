@@ -10,6 +10,28 @@
 #include <ctype.h>
 #include <errno.h>
 
+
+/*
+
+pipeline function to set input of one command as output of another
+void pipeline(struct input *in){
+	int fd[2];
+
+	int status = pipe(fd);
+	if(status == 0){
+		if(fork() == 0){
+			close(fd[0]);
+			dup2(fd[1], STDOUT_FILENO);
+			close(fd[1]);
+			execvp(in->command[0], in->arguments);
+		} else {
+			close(fd[1]);
+			dup2(fd[0], STDIN_FILENO);
+			close(fd[0]);
+		}
+	}
+}
+*/
 struct input // this struct stores infomation about each user input
 {
 	char input[512]; // largely place holder
@@ -24,6 +46,7 @@ struct charArray
 {
 	char* string[50];
 };
+
 
 int inRedirect(struct input* in, char* left, char* right)
 { // this function handles input redirection when a "<" character is detected
@@ -57,14 +80,52 @@ int inRedirect(struct input* in, char* left, char* right)
 	return 0; // RETURN VAL OF 0 MEANS SUCCESS
 }
 
+int outRedirect(struct input* in, char* left, char* right){
+	char *token = strdup(in->rawInput);
+	int iterator = 0;
+
+	token = strtok(token, ">");
+	while(token != NULL)
+  {
+		if(iterator == 0)
+			strcpy(left, token);
+		else if(iterator == 1)
+			strcpy(right, token);
+		token = strtok(NULL, ">");
+		token = strtok(token, " ");
+		iterator++;
+	}
+
+	if(iterator == 1)
+  {
+		fprintf(stderr, "Error: no output file\n");
+		return 1;
+	}
+	return 0;
+}
+
+int getCount(char* cmd)
+{
+	int count = 0;
+	char *token = strdup(cmd);
+
+	token = strtok(cmd, "|");
+	while(token != NULL)
+  {
+		count++;
+	}
+	return count;
+}
 
 int builtin(struct input* in, int error)
 { // this function handles built in commands: pwd, cd, exit
+
 	if (!strcmp(in->input, "exit"))
 	{
 		if (error == 0)
 		{
 			fprintf(stderr, "Error: active jobs still running\n");
+
 			return 1; // RETURN VAL 1 MEANS BUILT IN FUNCTION DIDN'T HAPPEN
 		}
 		fprintf(stderr, "Bye...\n");
@@ -111,10 +172,12 @@ int main(int argc, char *argv[])
 	pid_t pid;
 	char* left;
 	char* right;
+	//struct input inputs[16]; used to keep the '|' delimited pipe commands
 	
 	cmd[0] = (char*)malloc(size);
 	cmd[1] = NULL;
 	int userInArraycounter = 0;
+
 	struct input userInArray[500];
 	
 	while (1) // after creating the needed variables, start the main while loop
@@ -165,6 +228,7 @@ int main(int argc, char *argv[])
 			free(userIn);
 			continue;
 		}
+		
 		strcpy(userIn->input, cmd[0]);
 		strcpy(userIn->rawInput, userIn->input); // store the raw input for completed message
 		userIn->arguments[15] = NULL; // set the final argument to null
@@ -194,14 +258,12 @@ int main(int argc, char *argv[])
 			char* temp2 = (char*)malloc(sizeof(size));
 			temp2 = cmd[0];
 			if (temp2[strlen(temp2)-1] == *"&" && strcmp(temp2, "&")) // if "&" detected...
-                        {
+      {
 				background = 2; // FLAG THAT "&" WAS DETECTED AS PART OF AN ARGUMENT, NOT BY ITSELF
 				cmd[0][strlen(cmd[0]) -1] = *""; // replace the & character with nothing
 				userInArray[userInArraycounter] = *userIn; // store the current input into an array of background commands
-				userInArraycounter++;
-				
-                        }	
-
+				userInArraycounter++;	
+      }	
 			if (counter == 0) // the first word is both the command, and the first argument
 			{
 				userIn->command[counter] = cmd[0];
@@ -249,6 +311,18 @@ int main(int argc, char *argv[])
 					}
 					
 				}
+				else if(!strcmp(cmd[0], ">")) 
+        {
+                        		left = (char*)malloc(512 * sizeof(char));
+                        		right = (char*)malloc(512 * sizeof(char));
+                        		if (outRedirect(userIn, left, right) != 1) {
+                               			cont = 3;
+                                		break;
+        }
+					else {
+						cont = 1;
+					}
+                		}
 			}
 			cmd[0] = strtok(NULL, " "); // GET THE NEXT TOKEN, and repeat the loop
 			counter++;
@@ -286,7 +360,28 @@ int main(int argc, char *argv[])
 				exit(1);
 
 			}
-			else // flag is not marked
+
+                        else if(cont == 3) {
+				int outFile = open(right, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+				if(outFile == -1)
+				{
+					perror("Error: cannot open output file\n");
+					close(outFile);
+					continue;
+				}
+				dup2(outFile, 1);
+				close(outFile);
+				for (int j = 0; j < 16; j++)
+				{
+					if (userIn->arguments[j] != NULL && !strcmp(userIn->arguments[j], ">"))
+					{
+						userIn->arguments[j] = NULL;
+					}
+				}
+				execvp(userIn->command[0], userIn->arguments);
+				exit(1);
+			}
+			else
 			{
 				execvp(userIn->command[0], userIn->arguments);
 				exit(1);
